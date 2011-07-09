@@ -6,42 +6,43 @@ import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
 import java.util.Random;
 
-/**
- * Created by IntelliJ IDEA.
- * User: nahi
- * Date: 7/7/11
- * Time: 7:49 PM
- * To change this template use File | Settings | File Templates.
- */
 public class MethodHandleTest {
     public static void main(String[] args) throws Throwable {
         final String methodName = "target";
         int times = 100000;
 
         for (int idx = 0; idx < 10; ++idx) {
-            System.out.println("--");
-            benchmark("methodhandle", times, new Callback() {
-                public void call(Object receiver) {
-                    methodhandle(receiver, methodName);
+            System.out.println("-- " + idx);
+            benchmark("methodhandle lookup       ", times, new Callback() {
+                public void call(Object receiver) throws Throwable {
+                    methodhandleLookup(receiver, methodName);
                 }
             });
 
-            benchmark("reflection  ", times, new Callback() {
-                public void call(Object receiver) {
-                    reflection(receiver, methodName);
+            benchmark("methodhandle lookup+invoke", times, new Callback() {
+                public void call(Object receiver) throws Throwable {
+                    MethodHandle method = methodhandleLookup(receiver, methodName);
+                    methodhandleInvoke(receiver, method);
                 }
             });
 
-            benchmark("empty       ", times, new Callback() {
-                public void call(Object receiver) {
-                    empty(receiver, methodName);
+            benchmark("reflection   lookup       ", times, new Callback() {
+                public void call(Object receiver) throws Throwable {
+                    reflectionLookup(receiver, methodName);
+                }
+            });
+
+            benchmark("reflection   lookup+invoke", times, new Callback() {
+                public void call(Object receiver) throws Throwable {
+                    Method method = reflectionLookup(receiver, methodName);
+                    reflectionInvoke(receiver, method);
                 }
             });
         }
     }
 
     interface Callback {
-        public void call(Object receiver);
+        public void call(Object receiver) throws Throwable;
     }
 
     private static Random RANDOM = new Random();
@@ -55,44 +56,26 @@ public class MethodHandleTest {
         }
         double elapsed = (System.nanoTime() - start) / 1000000.0;
         System.out.println(
-                String.format("%s * %d: %.2f [msec], average: %.2f [nsec]",
+                String.format("%s * %d: %6.2f [msec], average: %6.2f [nsec]",
                         title, times, elapsed, elapsed / times * 1000.0));
     }
 
-    private static String methodhandle(Object receiver, String methodName) {
-        try {
-            MethodHandles.Lookup lookup = MethodHandles.lookup();
-            MethodType mt = MethodType.methodType(String.class, String.class);
-            MethodHandle method = lookup.findVirtual(receiver.getClass(), methodName, mt);
-
-            String dummy = methodName;
-            dummy = dummy.replace(dummy.charAt(RANDOM.nextInt(dummy.length())), dummy.charAt(RANDOM.nextInt(dummy.length())));
-            return (String) method.bindTo(receiver).invokeExact(dummy);
-        } catch (Throwable t) {
-            throw new RuntimeException(t.getMessage(), t);
-        }
+    private static MethodHandle methodhandleLookup(Object receiver, String methodName) throws Throwable {
+        MethodHandles.Lookup lookup = MethodHandles.lookup();
+        MethodType mt = MethodType.methodType(String.class, String.class);
+        return lookup.findVirtual(receiver.getClass(), methodName, mt);
+    }
+    
+    private static String methodhandleInvoke(Object receiver, MethodHandle method) throws Throwable {
+        return (String) method.bindTo(receiver).invokeExact("methodhandle");
     }
 
-    private static String reflection(Object receiver, String methodName) {
-        try {
-            Method method = receiver.getClass().getDeclaredMethod(methodName, new Class[]{String.class});
-
-            String dummy = methodName;
-            dummy = dummy.replace(dummy.charAt(RANDOM.nextInt(dummy.length())), dummy.charAt(RANDOM.nextInt(dummy.length())));
-            return (String) method.invoke(receiver, dummy);
-        } catch (Throwable t) {
-            throw new RuntimeException(t.getMessage(), t);
-        }
+    private static Method reflectionLookup(Object receiver, String methodName) throws Throwable {
+        return receiver.getClass().getDeclaredMethod(methodName, new Class[]{String.class});
     }
 
-    private static String empty(Object receiver, String methodName) {
-        try {
-            String dummy = methodName;
-            dummy = dummy.replace(dummy.charAt(RANDOM.nextInt(dummy.length())), dummy.charAt(RANDOM.nextInt(dummy.length())));
-            return dummy;
-        } catch (Throwable t) {
-            throw new RuntimeException(t.getMessage(), t);
-        }
+    private static String reflectionInvoke(Object receiver, Method method) throws Throwable {
+        return (String) method.invoke(receiver, "reflection");
     }
 }
 
