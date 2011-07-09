@@ -13,26 +13,39 @@ public class MethodHandleTest {
 
         for (int idx = 0; idx < 10; ++idx) {
             System.out.println("-- " + idx);
-            benchmark("methodhandle lookup       ", times, new Callback() {
+            benchmark("methodhandle1 lookup       ", times, new Callback() {
                 public void call(Object receiver) throws Throwable {
                     methodhandleLookup(receiver, methodName);
                 }
             });
 
-            benchmark("methodhandle lookup+invoke", times, new Callback() {
+            benchmark("methodhandle1 lookup+invoke", times, new Callback() {
                 public void call(Object receiver) throws Throwable {
                     MethodHandle method = methodhandleLookup(receiver, methodName);
                     methodhandleInvoke(receiver, method);
                 }
             });
 
-            benchmark("reflection   lookup       ", times, new Callback() {
+            benchmark("methodhandle2 lookup       ", times, new Callback() {
+                public void call(Object receiver) throws Throwable {
+                    methodhandleLookupAsType(receiver, methodName);
+                }
+            });
+
+            benchmark("methodhandle2 lookup+invoke", times, new Callback() {
+                public void call(Object receiver) throws Throwable {
+                    MethodHandle method = methodhandleLookupAsType(receiver, methodName);
+                    methodhandleInvokeExact(receiver, method);
+                }
+            });
+
+            benchmark("reflection    lookup       ", times, new Callback() {
                 public void call(Object receiver) throws Throwable {
                     reflectionLookup(receiver, methodName);
                 }
             });
 
-            benchmark("reflection   lookup+invoke", times, new Callback() {
+            benchmark("reflection    lookup+invoke", times, new Callback() {
                 public void call(Object receiver) throws Throwable {
                     Method method = reflectionLookup(receiver, methodName);
                     reflectionInvoke(receiver, method);
@@ -60,14 +73,24 @@ public class MethodHandleTest {
                         title, times, elapsed, elapsed / times * 1000.0));
     }
 
+    private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
+    private static final MethodType MT_STRING_STRING = MethodType.methodType(String.class, String.class);
+    private static final MethodType MT_STRING_OBJECT_STRING = MethodType.methodType(String.class, Object.class, String.class);
+
     private static MethodHandle methodhandleLookup(Object receiver, String methodName) throws Throwable {
-        MethodHandles.Lookup lookup = MethodHandles.lookup();
-        MethodType mt = MethodType.methodType(String.class, String.class);
-        return lookup.findVirtual(receiver.getClass(), methodName, mt);
+        return LOOKUP.findVirtual(receiver.getClass(), methodName, MT_STRING_STRING);
     }
     
     private static String methodhandleInvoke(Object receiver, MethodHandle method) throws Throwable {
         return (String) method.bindTo(receiver).invokeExact("methodhandle");
+    }
+
+    private static MethodHandle methodhandleLookupAsType(Object receiver, String methodName) throws Throwable {
+        return LOOKUP.findVirtual(receiver.getClass(), methodName, MT_STRING_STRING).asType(MT_STRING_OBJECT_STRING);
+    }
+
+    private static String methodhandleInvokeExact(Object receiver, MethodHandle method) throws Throwable {
+        return (String) method.invokeExact(receiver, "methodhandle");
     }
 
     private static Method reflectionLookup(Object receiver, String methodName) throws Throwable {
